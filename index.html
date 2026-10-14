@@ -1,0 +1,1254 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>머니런 - 모의주식 서바이벌</title>
+<!-- 친구와 방 코드로 접속하는 기능에만 쓰입니다. 혼자 하기는 이 파일 없이도 동작해요. -->
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js" onerror="var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js';document.head.appendChild(s)"></script>
+<style>
+  :root{
+    --bg:#0e1116; --panel:#171b22; --panel2:#1e242d; --line:#2a313c;
+    --text:#e8ecf2; --muted:#8b95a5; --up:#ef4444; --down:#3b82f6; --accent:#f5b942; --hot:#ff4d6d;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif;font-size:14px;min-height:100vh}
+  button{font-family:inherit;cursor:pointer}
+  header{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:12px 20px 14px;background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:10}
+  .logo{font-size:18px;font-weight:800;letter-spacing:-.3px}
+  .logo span{color:var(--accent)}
+  .day .rn{background:var(--accent);color:#1a1300;font-weight:800;border-radius:8px;padding:7px 14px;font-size:15px}
+  .summary{display:flex;gap:22px;flex-wrap:wrap}
+  .summary div{display:flex;flex-direction:column;gap:2px}
+  .summary small{color:var(--muted);font-size:11px}
+  .summary b{font-size:16px;font-variant-numeric:tabular-nums}
+  .hbtns{display:flex;align-items:center;gap:10px}
+  .rdy{font-size:12px;color:var(--muted);font-weight:700}
+  .endbtn{border:none;border-radius:10px;padding:11px 20px;font-size:15px;font-weight:800;background:linear-gradient(90deg,var(--accent),#ff9f43);color:#1a1300}
+  .endbtn:hover{filter:brightness(1.08)}
+  .endbtn:disabled{opacity:.4;cursor:default}
+  .endbtn.alt{background:var(--panel2);color:var(--text);border:1px solid var(--line);padding:9px 14px;font-size:13px}
+  .bar{position:absolute;left:0;right:0;bottom:0;height:4px;background:var(--line)}
+  .bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--accent),var(--hot));transition:width .4s}
+  main{display:grid;grid-template-columns:290px 1fr 310px;gap:14px;padding:14px 20px;max-width:1500px;margin:0 auto}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  .card h2{font-size:13px;font-weight:600;color:var(--muted);padding:12px 16px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
+  .up{color:var(--up)} .down{color:var(--down)} .flat{color:var(--muted)}
+  .num{font-variant-numeric:tabular-nums}
+  /* 오늘의 뉴스 */
+  #newsBoard{padding:12px 14px 4px;display:flex;flex-direction:column;gap:8px}
+  .ni{border-radius:10px;padding:12px 14px;background:linear-gradient(90deg,#3a0f1a,#24121c);border:1px solid #6b1d31;display:flex;gap:12px;align-items:flex-start}
+  .ni.rumor{background:linear-gradient(90deg,#3a2e0a,#241d10);border-color:#7a6215}
+  .ni .tag{flex:none;background:var(--hot);color:#fff;font-weight:800;font-size:12px;padding:4px 9px;border-radius:5px;margin-top:1px}
+  .ni.rumor .tag{background:var(--accent);color:#1a1300}
+  .ni .txt{font-weight:700;font-size:15px;line-height:1.45}
+  .ni .note{margin-top:3px;font-size:12px;color:#f3d98a;font-weight:500}
+  .newshint{padding:2px 16px 10px;font-size:12px;color:var(--muted)}
+  /* 종목 */
+  .stock{display:grid;grid-template-columns:1fr auto;gap:2px 8px;padding:10px 16px;border-bottom:1px solid var(--line);cursor:pointer;transition:background .15s}
+  .stock:hover{background:var(--panel2)}
+  .stock.active{background:var(--panel2);box-shadow:inset 3px 0 0 var(--accent)}
+  .stock .nm{font-weight:600}
+  .stock .sym{color:var(--muted);font-size:11px;margin-left:6px}
+  .stock .badge{margin-left:6px;font-size:10px;background:var(--hot);color:#fff;border-radius:4px;padding:1px 5px;font-weight:700}
+  .stock .pr{text-align:right;font-weight:600}
+  .stock .sub{color:var(--muted);font-size:11px}
+  .stock .chg{text-align:right;font-size:12px}
+  .flash-up{animation:fu .7s}.flash-down{animation:fd .7s}
+  @keyframes fu{from{background:rgba(239,68,68,.3)}to{background:transparent}}
+  @keyframes fd{from{background:rgba(59,130,246,.3)}to{background:transparent}}
+  /* 차트 */
+  .head{padding:10px 18px 6px;display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:8px}
+  .head .t{font-size:20px;font-weight:700}
+  .head .t small{color:var(--muted);font-weight:400;font-size:12px;margin-left:6px}
+  .head .p{font-size:28px;font-weight:700;text-align:right}
+  .head .p small{display:block;font-size:13px;font-weight:500}
+  #chartWrap{padding:6px 12px 4px;position:relative}
+  canvas{width:100%;height:270px;display:block}
+  #tip{position:absolute;pointer-events:none;background:#000c;border:1px solid var(--line);padding:4px 8px;border-radius:6px;font-size:12px;display:none}
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--line)}
+  .stats div{padding:11px 16px;border-right:1px solid var(--line)}
+  .stats div:last-child{border-right:none}
+  .stats small{color:var(--muted);font-size:11px;display:block;margin-bottom:3px}
+  /* 주문 */
+  .order{padding:16px;display:flex;flex-direction:column;gap:11px}
+  .tabs{display:grid;grid-template-columns:1fr 1fr;background:var(--panel2);border-radius:8px;padding:3px}
+  .tabs button{border:none;background:none;color:var(--muted);padding:8px;border-radius:6px;font-weight:600;font-size:13px}
+  .tabs button.buy.on{background:var(--up);color:#fff}
+  .tabs button.sell.on{background:var(--down);color:#fff}
+  .row{display:flex;justify-content:space-between;font-size:13px}
+  .row span:first-child{color:var(--muted)}
+  label{font-size:12px;color:var(--muted)}
+  input[type=number],input[type=text]{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:10px 12px;font-size:16px;margin-top:6px;font-family:inherit}
+  input:focus{outline:none;border-color:var(--accent)}
+  .quick{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+  .quick button{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:6px 0;font-size:12px}
+  .quick button:hover{border-color:var(--accent)}
+  .go{border:none;border-radius:10px;padding:13px;font-size:15px;font-weight:700;color:#fff}
+  .go.buy{background:var(--up)}.go.sell{background:var(--down)}
+  .go:hover{filter:brightness(1.1)}
+  .hint{font-size:11px;color:var(--muted);line-height:1.5}
+  /* 정보상 */
+  .shopitem{display:grid;grid-template-columns:1fr auto;gap:2px 10px;align-items:center;padding:10px 12px;background:var(--panel2);border:1px solid var(--line);border-radius:10px}
+  .shopitem b{font-size:13px}
+  .shopitem small{display:block;color:var(--muted);font-size:11px;margin-top:2px;line-height:1.4}
+  .shopitem button{background:var(--accent);color:#1a1300;border:none;border-radius:8px;padding:8px 10px;font-weight:800;font-size:12px;line-height:1.35;white-space:nowrap}
+  .shopitem button:disabled{opacity:.35;cursor:default}
+  .shopitem button:not(:disabled):hover{filter:brightness(1.1)}
+  .hlog{display:flex;flex-direction:column;gap:6px}
+  .hl{font-size:12px;line-height:1.5;padding:8px 10px;border-radius:8px;background:rgba(245,185,66,.08);border:1px dashed #7a6215}
+  .hl .t{font-weight:700}
+  .stock .hintb{margin-left:6px;font-size:10px;border-radius:4px;padding:1px 5px;font-weight:700;background:#2b2150;color:#c9b8ff}
+  /* 순위 */
+  .rk{display:grid;grid-template-columns:28px 1fr auto;gap:8px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--line)}
+  .rk:last-child{border-bottom:none}
+  .rk.me{background:rgba(245,185,66,.1)}
+  .rk .no{font-size:18px;text-align:center}
+  .rk .who{font-weight:600}
+  .rk .tot{text-align:right;font-weight:700}
+  .rk .tot small{display:block;font-size:11px;font-weight:500}
+  /* 하단 */
+  .bottom{grid-column:1/-1;display:grid;grid-template-columns:3fr 2fr;gap:14px}
+  table{width:100%;border-collapse:collapse}
+  th{color:var(--muted);font-weight:500;font-size:11px;text-align:right;padding:9px 14px;border-bottom:1px solid var(--line)}
+  td{padding:10px 14px;text-align:right;border-bottom:1px solid var(--line);font-size:13px}
+  th:first-child,td:first-child{text-align:left}
+  tr:last-child td{border-bottom:none}
+  .empty{color:var(--muted);text-align:center;padding:28px 10px;font-size:13px}
+  .scroll{max-height:280px;overflow:auto}
+  .mini{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:4px 9px;font-size:11px}
+  .mini:hover{border-color:var(--down)}
+  .nl{padding:11px 16px;border-bottom:1px solid var(--line);font-size:13px;line-height:1.5}
+  .nl small{color:var(--muted);display:block;margin-bottom:3px;font-weight:700}
+  .nl .it{margin-bottom:4px}
+  .nl .tg{font-size:11px;font-weight:700;border-radius:4px;padding:1px 6px;margin-right:6px}
+  .nl .tg.ok{background:rgba(239,68,68,.18);color:var(--up)}
+  .nl .tg.no{background:rgba(139,149,165,.2);color:var(--muted)}
+  .nl .mv{margin-top:5px;font-size:12px;display:flex;flex-wrap:wrap;gap:4px 12px;color:var(--muted)}
+  #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:#222a35;border:1px solid var(--line);padding:11px 20px;border-radius:10px;opacity:0;transition:.25s;pointer-events:none;z-index:60;max-width:90vw;text-align:center}
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  /* 오버레이 */
+  .overlay{position:fixed;inset:0;background:rgba(5,7,10,.88);display:none;align-items:center;justify-content:center;z-index:50;padding:20px;backdrop-filter:blur(4px)}
+  .overlay.show{display:flex}
+  .modal{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:28px;width:100%;max-width:460px;max-height:92vh;overflow:auto}
+  .modal h1{font-size:26px;letter-spacing:-.5px;margin-bottom:6px}
+  .modal h1 span{color:var(--accent)}
+  .modal p.sub{color:var(--muted);margin-bottom:16px;line-height:1.5}
+  .modal ul{margin:14px 0 18px 18px;color:#c9d1dc;line-height:1.75;font-size:13px}
+  .bigbtn{width:100%;border:none;border-radius:12px;padding:14px;font-size:16px;font-weight:800;background:var(--accent);color:#1a1300;margin-top:14px}
+  .bigbtn:hover{filter:brightness(1.08)}
+  .bigbtn:disabled{opacity:.5;cursor:default}
+  .bigbtn.ghost{background:var(--panel2);color:var(--text);border:1px solid var(--line)}
+  .or{text-align:center;color:var(--muted);font-size:12px;margin-top:16px}
+  .joinrow{display:flex;gap:8px;align-items:stretch}
+  .joinrow input{text-transform:uppercase;letter-spacing:4px;text-align:center;font-weight:800}
+  .joinrow .bigbtn{width:auto;padding:0 22px;margin-top:6px}
+  #netMsg{margin-top:10px;min-height:16px;color:#ffb3c0}
+  .roomcode{font-size:44px;font-weight:900;letter-spacing:8px;text-align:center;color:var(--accent);background:var(--panel2);border:1px dashed #7a6215;border-radius:12px;padding:14px 14px 14px 22px;margin:6px 0 4px;user-select:all}
+  .pl{display:flex;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--line)}
+  .chk{display:flex;align-items:center;gap:8px;margin-top:14px;font-size:13px;color:var(--text);cursor:pointer}
+  .chk input{width:auto;margin:0}
+  .banner{position:fixed;left:50%;top:38%;transform:translate(-50%,-50%) scale(.8);font-size:40px;font-weight:900;color:#fff;text-shadow:0 4px 24px #000;opacity:0;pointer-events:none;z-index:40;white-space:nowrap}
+  .banner.show{animation:pop 1.3s ease-out}
+  @keyframes pop{0%{opacity:0;transform:translate(-50%,-50%) scale(.6)}15%{opacity:1;transform:translate(-50%,-50%) scale(1.1)}30%{transform:translate(-50%,-50%) scale(1)}80%{opacity:1}100%{opacity:0;transform:translate(-50%,-50%) scale(1)}}
+  .result-title{text-align:center;font-size:30px;font-weight:900;margin-bottom:4px}
+  .penalty{margin-top:14px;background:rgba(255,77,109,.12);border:1px dashed var(--hot);border-radius:10px;padding:12px;text-align:center;font-weight:700}
+  @media(max-width:1100px){
+    main{grid-template-columns:1fr}
+    .bottom{grid-template-columns:1fr}
+    #list{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr))}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">💸 머니<span>런</span></div>
+  <div class="day"><div class="rn" id="dNo">DAY 1</div></div>
+  <div class="summary">
+    <div><small>총 자산</small><b id="sTotal" class="num">-</b></div>
+    <div><small>보유 현금</small><b id="sCash" class="num">-</b></div>
+    <div><small>총 손익</small><b id="sPL" class="num">-</b></div>
+  </div>
+  <div class="hbtns">
+    <span class="rdy" id="readyInfo"></span>
+    <button class="endbtn alt" id="forceBtn" style="display:none">⏩ 강제로 넘기기</button>
+    <button class="endbtn" id="endDay" disabled>🌙 하루 끝내기</button>
+  </div>
+  <div class="bar"><i id="barFill"></i></div>
+</header>
+
+<main>
+  <section class="card">
+    <h2>종목 <span style="font-weight:400">가상 기업 · 가상 시세</span></h2>
+    <div id="list"></div>
+  </section>
+
+  <section class="card">
+    <h2>📰 오늘의 뉴스 <span id="newsDay" style="font-weight:400"></span></h2>
+    <div id="newsBoard"></div>
+    <div class="newshint" id="newsHint"></div>
+    <div class="head">
+      <div class="t"><span id="cName">-</span><small id="cSym"></small></div>
+      <div class="p"><span id="cPrice" class="num">-</span><small id="cChg" class="num"></small></div>
+    </div>
+    <div id="chartWrap"><canvas id="chart"></canvas><div id="tip"></div></div>
+    <div class="stats">
+      <div><small>시작가</small><span id="stStart" class="num">-</span></div>
+      <div><small>최고가</small><span id="stHigh" class="num up">-</span></div>
+      <div><small>최저가</small><span id="stLow" class="num down">-</span></div>
+      <div><small>보유 수량</small><span id="stQty" class="num">-</span></div>
+    </div>
+  </section>
+
+  <div style="display:flex;flex-direction:column;gap:14px">
+    <section class="card">
+      <h2>주문</h2>
+      <div class="order">
+        <div class="tabs">
+          <button class="buy on" id="tabBuy">매수</button>
+          <button class="sell" id="tabSell">매도</button>
+        </div>
+        <div class="row"><span>현재가</span><b id="oPrice" class="num">-</b></div>
+        <div class="row"><span id="oAvailLabel">주문 가능</span><b id="oAvail" class="num">-</b></div>
+        <div>
+          <label for="qty">수량 (주)</label>
+          <input type="number" id="qty" min="1" step="1" value="1">
+        </div>
+        <div class="quick">
+          <button data-q="1">+1</button>
+          <button data-q="10">+10</button>
+          <button data-q="100">+100</button>
+          <button data-q="max">최대</button>
+        </div>
+        <div class="row"><span>예상 금액</span><b id="oTotal" class="num">-</b></div>
+        <button class="go buy" id="goBtn">매수하기</button>
+        <p class="hint">수수료 0.015%, 매도 시 거래세 0.18%<br>주문은 오늘 종가 기준으로 체결되고, 하루가 끝나면 주가가 바뀝니다.</p>
+      </div>
+    </section>
+    <section class="card">
+      <h2>🕵️ 정보상 <span id="shopSel" style="font-weight:400"></span></h2>
+      <div class="order">
+        <div class="shopitem"><div><b>🗣 귀띔</b><small>선택한 종목의 내일 방향 · 정확도 약 75%</small></div><button id="buyTip"></button></div>
+        <div class="shopitem"><div><b>🕶 내부 정보</b><small>선택한 종목의 내일 변동 규모(대폭락·대폭등 등)를 확실하게</small></div><button id="buyInsider"></button></div>
+        <div class="shopitem"><div><b>🔎 팩트체크</b><small>오늘 찌라시가 사실인지 가짜인지 확인</small></div><button id="buyCheck"></button></div>
+        <div class="hlog" id="hintLog"></div>
+        <p class="hint">정보는 <b>하루에 1개만</b> 살 수 있고, 하루가 끝나면 사라져요. 비용은 보유 현금에서 빠져나갑니다.</p>
+      </div>
+    </section>
+    <section class="card">
+      <h2>실시간 순위</h2>
+      <div id="rank"></div>
+    </section>
+  </div>
+
+  <div class="bottom">
+    <section class="card">
+      <h2>보유 종목</h2>
+      <div class="scroll" id="holdings"></div>
+    </section>
+    <section class="card">
+      <h2>지난 뉴스와 결과</h2>
+      <div class="scroll" id="newsLog"><div class="empty">아직 지난 뉴스가 없어요.</div></div>
+    </section>
+  </div>
+</main>
+
+<div class="banner" id="banner"></div>
+<div id="toast"></div>
+
+<!-- 시작 화면 -->
+<div class="overlay show" id="startOv">
+  <div class="modal">
+    <h1>💸 머니<span>런</span></h1>
+    <p class="sub">뉴스를 읽고, 하루를 넘기고, 가장 똑똑하게 불린 사람이 우승!</p>
+    <label for="pname">내 이름 (최대 8자)</label>
+    <input type="text" id="pname" maxlength="8" value="나" autocomplete="off">
+    <ul>
+      <li>시작 자금 <b>1,000만 원</b>, 총 <b>15일</b> 진행</li>
+      <li>하루가 시작되면 <b>오늘의 뉴스</b>가 올라와요. 시간 제한은 없어요.</li>
+      <li>충분히 생각하고 사고판 뒤 <b>하루 끝내기</b>를 누르면 주가가 움직입니다.</li>
+      <li><b>[찌라시]</b>는 절반이 가짜! 속으면 손해를 봅니다.</li>
+      <li><b>정보상</b>에게 돈을 내면 내일 시세 힌트(대폭락 경고 등)를 <b>하루에 1개</b>까지 살 수 있어요. 단, 귀띔은 틀릴 수도 있어요.</li>
+      <li>마지막 날은 변동폭이 <b>1.5배</b> 🔥</li>
+      <li><b>꼴찌는 벌칙!</b> 친구와 할 때는 모두 <b>준비 완료</b>를 눌러야 하루가 넘어가요.</li>
+    </ul>
+    <button class="bigbtn" id="startBtn">🎮 혼자 하기 (AI 라이벌 3명)</button>
+    <div class="or">— 또는 친구와 함께 (최대 4명) —</div>
+    <button class="bigbtn ghost" id="hostBtn">👥 방 만들기</button>
+    <div class="joinrow">
+      <input type="text" id="joinCode" maxlength="5" placeholder="방 코드" autocomplete="off">
+      <button class="bigbtn ghost" id="joinBtn">참가</button>
+    </div>
+    <div class="hint" id="netMsg"></div>
+  </div>
+</div>
+
+<!-- 대기실 -->
+<div class="overlay" id="lobbyOv">
+  <div class="modal">
+    <h1>👥 <span>대기실</span></h1>
+    <p class="sub" id="lobbySub">이 코드를 친구들에게 알려 주세요.</p>
+    <div class="roomcode" id="roomCode">-----</div>
+    <button class="bigbtn ghost" id="copyCode" style="margin-top:8px;padding:10px;font-size:13px">📋 코드 복사</button>
+    <div id="lobbyPlayers" style="margin-top:14px"></div>
+    <label class="chk" id="aiRow"><input type="checkbox" id="aiOpt"> AI 라이벌도 함께 참가시키기</label>
+    <button class="bigbtn" id="lobbyStart">게임 시작</button>
+    <div class="hint" id="lobbyWait" style="margin-top:12px;text-align:center"></div>
+    <button class="bigbtn ghost" id="lobbyLeave" style="margin-top:10px">나가기</button>
+  </div>
+</div>
+
+<!-- 결과 화면 -->
+<div class="overlay" id="endOv">
+  <div class="modal">
+    <div class="result-title" id="rTitle"></div>
+    <p class="sub" id="rSub" style="text-align:center"></p>
+    <div id="rRank"></div>
+    <div class="penalty" id="rPen" style="display:none"></div>
+    <button class="bigbtn" id="againBtn">다시 도전</button>
+  </div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  const START_CASH = 10_000_000;
+  const FEE = 0.00015, TAX = 0.0018;
+  const TOTAL_DAYS = 15;
+  const MAX_POINTS = 60;
+  const HINT_COST = { tip: 400_000, insider: 1_200_000, check: 500_000 };   // 정보상 가격(원)
+  const MAX_HUMANS = 4;                                                      // 방 최대 인원
+  const PEER_PREFIX = 'moneyrun-kr-';
+  const HUMAN_EMOJIS = ['🙋','😎','🤠','🧑‍🚀'];
+
+  const DEFS = [
+    ['HBE','한빛전자',72000,0.006],
+    ['PBO','푸른바이오',184000,0.014],
+    ['SJM','세종모빌리티',95500,0.009],
+    ['DBE','달빛엔터',48200,0.012],
+    ['ORE','오름에너지',231000,0.008],
+    ['GAS','가온소프트',36800,0.011],
+    ['NRF','누리푸드',58900,0.005],
+    ['BNC','별내건설',21400,0.010],
+  ];
+
+  // 뉴스 모음 (rumor: true 이면 찌라시 → 50% 확률로 가짜)
+  const EVENTS = [
+    {text:'한빛전자, 신형 스마트폰 공개! 예약 사이트가 마비됐다', fx:{HBE:14}},
+    {text:'푸른바이오, 탈모 치료제 임상 대성공 발표', fx:{PBO:18}},
+    {text:'세종모빌리티, 시험 주행 중 자율주행차가 길을 잃었다', fx:{SJM:-13}},
+    {text:'달빛엔터, 신인 그룹 데뷔곡이 음원 차트 1위 석권', fx:{DBE:16}},
+    {text:'오름에너지 정유 시설에 화재 발생, 가동 일부 중단', fx:{ORE:-15}},
+    {text:'가온소프트 앱 서버 먹통, 이용자 항의 폭주', fx:{GAS:-12}},
+    {text:'누리푸드 신제품 라면, 맵기 논란 속에 완판 행진', fx:{NRF:11}},
+    {text:'별내건설 신축 아파트 부실 시공 의혹 제기', fx:{BNC:-14}},
+    {text:'기록적 한파 예보! 난방 수요 폭증 전망', fx:{ORE:13, BNC:-6, NRF:4}},
+    {text:'황금연휴 시작, 여행·소비 심리 활활', fx:{DBE:8, SJM:9, NRF:7}},
+    {text:'기준금리 인상 발표, 시장 전체가 움츠러든다', fx:{HBE:-7,PBO:-8,SJM:-7,DBE:-6,ORE:-5,GAS:-9,NRF:-4,BNC:-10}},
+    {text:'정부, 대규모 신도시 개발 계획 전격 발표', fx:{BNC:17, ORE:5}},
+    {text:'한빛전자와 가온소프트, 깜짝 공동 개발 선언', fx:{HBE:9, GAS:13}},
+    {text:'푸른바이오 연구원, 임상 결과 조작 의혹 폭로', fx:{PBO:-19}},
+    {text:'AI 열풍! 소프트웨어 종목에 뭉칫돈 몰린다', fx:{GAS:15, HBE:6}},
+    {text:'세종모빌리티, 해외 택시 회사와 대형 계약 체결', fx:{SJM:15}},
+    {text:'오름에너지, 태양광 사업에 대규모 투자 발표', fx:{ORE:10}},
+    {text:'누리푸드, 해외 수출액 사상 최대치 경신', fx:{NRF:9}},
+    {text:'달빛엔터 소속 가수 논란 확산, 팬들 실망', fx:{DBE:-12}},
+    {text:'가온소프트, 개인정보 유출 사고 발생', fx:{GAS:-14}},
+    {text:'정부, 건설 규제 강화 방침 발표', fx:{BNC:-10}},
+    {text:'푸른바이오, 신약 승인 심사 통과', fx:{PBO:13}},
+    {rumor:true, text:'[찌라시] 달빛엔터 대표가 거대 기획사 인수를 추진 중이라는 소문', fx:{DBE:17}},
+    {rumor:true, text:'[찌라시] 누리푸드 신제품에서 이물질이 나왔다는 소문', fx:{NRF:-14}},
+    {rumor:true, text:'[찌라시] 오름에너지가 대형 유전을 발견했다는 소문', fx:{ORE:18}},
+    {rumor:true, text:'[찌라시] 별내건설 대표가 해외로 도피했다는 소문', fx:{BNC:-16}},
+    {rumor:true, text:'[찌라시] 한빛전자, 세계 1위 기업과 합병설', fx:{HBE:16}},
+    {rumor:true, text:'[찌라시] 세종모빌리티, 대규모 리콜이 임박했다는 소문', fx:{SJM:-15}},
+    {rumor:true, text:'[찌라시] 글로벌 기업이 가온소프트 인수를 검토 중이라는 소문', fx:{GAS:17}},
+    {rumor:true, text:'[찌라시] 푸른바이오, 해외 대형 제약사와 협상 중이라는 소문', fx:{PBO:16}},
+  ];
+
+  const RIVALS = [
+    {id:'pro',  name:'여우 대리',   emoji:'🦊', style:'pro'},
+    {id:'gull', name:'호랑이 과장', emoji:'🐯', style:'gullible'},
+    {id:'rand', name:'거북이 인턴', emoji:'🐢', style:'random'},
+  ];
+  const PENALTIES = [
+    '꼴찌는 오늘 간식 쏘기 🍩',
+    '꼴찌는 다음 판 심부름 담당 🏃',
+    '꼴찌는 허공에 대고 애교 한 번! 🥺',
+    '꼴찌는 오늘 하루 존댓말만 쓰기 🎩',
+    '꼴찌는 가장 웃긴 표정으로 인증샷 📸',
+  ];
+
+  const $ = id => document.getElementById(id);
+  const won = n => Math.round(n).toLocaleString('ko-KR') + '원';
+  const num = n => Math.round(n).toLocaleString('ko-KR');
+  const pct = n => (n > 0 ? '+' : '') + n.toFixed(2) + '%';
+  const cls = n => n > 0 ? 'up' : n < 0 ? 'down' : 'flat';
+  const arrow = n => n > 0 ? '▲' : n < 0 ? '▼' : '-';
+  const rnd = (a,b) => Math.floor(a + Math.random() * (b - a + 1));
+  const gauss = () => (Math.random() + Math.random() + Math.random() - 1.5) / 1.5;   // 대략 -1 ~ 1
+  const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--){ const j = rnd(0,i); [a[i],a[j]] = [a[j],a[i]]; } return a; };
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const medal = i => i < 3 ? ['🥇','🥈','🥉'][i] : String(i + 1);
+
+  function tickUnit(p){ return p < 50000 ? 50 : p < 200000 ? 100 : 500; }
+  function roundPrice(p){ const u = tickUnit(p); return Math.max(u, Math.round(p / u) * u); }
+
+  /* ---------- 상태 ---------- */
+  // G.mode: 'solo'(혼자) | 'host'(방장: 게임 계산을 전부 담당) | 'client'(참가자: 방장이 보내 준 화면만 그림)
+  let G = null;
+  let NET = null;
+  let selected = DEFS[0][0];
+  let side = 'buy';
+  let hoverIdx = null;
+  let bannerSeq = 0, bannerText = '', lastBanner = -1;
+  let shownEnd = false;
+
+  const mkPlayer = o => ({ cash: START_CASH, holdings: {}, hints: [], symHints: {}, hintUsed: false, checked: {}, ready: false, gone: false, human: true, ...o });
+  const resetPlayer = p => Object.assign(p, { cash: START_CASH, holdings: {}, hints: [], symHints: {}, hintUsed: false, checked: {}, ready: false });
+
+  function newStocks(){
+    const stocks = {};
+    DEFS.forEach(([sym,name,price,vol]) => {
+      const hist = []; let p = price;
+      for (let i = 0; i < 30; i++){ p = roundPrice(p * (1 + gauss() * vol * 2.2)); hist.push(p); }
+      stocks[sym] = { sym, name, vol, start: p, price: p, prev: hist[hist.length - 2], hist };
+    });
+    return stocks;
+  }
+
+  // 15일치 뉴스 만들기: 대부분 하루 2건, 일부는 1건
+  function buildDays(){
+    const pool = shuffle(EVENTS).map(e => ({ ...e, truth: e.rumor ? Math.random() < 0.5 : true }));
+    const days = [];
+    for (let d = 0; d < TOTAL_DAYS; d++){
+      const n = (d % 7 === 6) ? 1 : 2;
+      days.push(pool.splice(0, n));
+    }
+    return days;
+  }
+
+  function resetUI(){
+    selected = DEFS[0][0]; hoverIdx = null; shownEnd = false;
+    $('list').innerHTML = '';
+    $('qty').value = 1;
+    $('newsLog').innerHTML = '<div class="empty">아직 지난 뉴스가 없어요.</div>';
+    $('endOv').classList.remove('show');
+  }
+
+  function createGame(players, gmode){
+    G = { mode: gmode, phase: 'play', day: 1, busy: false, stocks: newStocks(), days: buildDays(), newsLog: [], players, outcome: {}, effectSyms: [] };
+    resetUI();
+    $('startOv').classList.remove('show');
+    $('lobbyOv').classList.remove('show');
+    openDay();
+    render();
+    if (gmode === 'host') broadcast();
+  }
+  function newSolo(name){
+    createGame([
+      mkPlayer({ id:'me', name: name || '나', emoji:'🙋' }),
+      ...RIVALS.map(r => mkPlayer({ ...r, human: false })),
+    ], 'solo');
+  }
+
+  const me = () => G.players[0];
+  const todayNews = () => G.days[G.day - 1];
+  const isFinal = () => G.day === TOTAL_DAYS;
+  const newsKey = i => `${G.day}:${i}`;
+
+  /* ---------- 거래 (플레이어·라이벌 공용) ---------- */
+  function buy(p, sym, qty){
+    qty = Math.floor(qty); if (!(qty >= 1)) return false;
+    const s = G.stocks[sym], cost = s.price * qty * (1 + FEE);
+    if (cost > p.cash) return false;
+    p.cash -= cost;
+    const h = p.holdings[sym] || { qty: 0, avg: 0 };
+    h.avg = (h.avg * h.qty + s.price * qty) / (h.qty + qty);
+    h.qty += qty; p.holdings[sym] = h;
+    return true;
+  }
+  function sell(p, sym, qty){
+    qty = Math.floor(qty);
+    const h = p.holdings[sym], s = G.stocks[sym];
+    if (!h || !(qty >= 1) || h.qty < qty) return false;
+    p.cash += s.price * qty * (1 - FEE - TAX);
+    h.qty -= qty; if (h.qty === 0) delete p.holdings[sym];
+    return true;
+  }
+  const total = p => p.total != null ? p.total
+    : p.cash + Object.entries(p.holdings).reduce((a,[sym,h]) => a + h.qty * G.stocks[sym].price, 0);
+  const maxBuy = sym => Math.floor(me().cash / (G.stocks[sym].price * (1 + FEE)));
+
+  /* ---------- 플레이어 행동 (방장·혼자 모드에서만 실행) ---------- */
+  const bad = msg => ({ ok: false, msg });
+
+  function actTrade(p, type, sym, qty){
+    if (G.phase !== 'play' || G.busy) return bad('지금은 거래할 수 없어요.');
+    if (p.ready) return bad('준비 완료 상태에서는 거래할 수 없어요. 준비를 취소하세요.');
+    const s = G.stocks[sym];
+    qty = Math.floor(qty);
+    if (!s) return bad('없는 종목이에요.');
+    if (!(qty >= 1)) return bad('수량을 1주 이상 입력하세요.');
+    if (type === 'buy'){
+      if (!buy(p, sym, qty)) return bad('보유 현금이 부족합니다.');
+      return { ok: true, msg: `${s.name} ${num(qty)}주 매수 (${num(s.price)}원)` };
+    }
+    if (!sell(p, sym, qty)) return bad('보유 수량이 부족합니다.');
+    return { ok: true, msg: `${s.name} ${num(qty)}주 매도 (${num(s.price)}원)` };
+  }
+
+  function bucket(c){
+    if (c <= -10) return { dir: -2, label: '대폭락 📉' };
+    if (c <= -4)  return { dir: -1, label: '하락' };
+    if (c < 4)    return { dir: 0,  label: '보합권' };
+    if (c < 10)   return { dir: 1,  label: '상승' };
+    return { dir: 2, label: '대폭등 🚀' };
+  }
+  const DIR_ICON = { '-2':'📉', '-1':'▼', '0':'–', '1':'▲', '2':'🚀' };
+
+  function actHint(p, kind, sym){
+    if (G.phase !== 'play' || G.busy) return bad('지금은 살 수 없어요.');
+    if (p.ready) return bad('준비 완료 상태에서는 살 수 없어요. 준비를 취소하세요.');
+    if (p.hintUsed) return bad('힌트는 하루에 1개만 살 수 있어요.');
+    const cost = HINT_COST[kind];
+    if (!cost) return bad('없는 상품이에요.');
+    if (p.cash < cost) return bad('현금이 부족합니다.');
+    let msg;
+    if (kind === 'check'){
+      const targets = todayNews().map((ev,i) => [ev, newsKey(i)]).filter(([ev,k]) => ev.rumor && !p.checked[k]);
+      if (!targets.length) return bad('확인할 찌라시가 없어요.');
+      p.cash -= cost;
+      targets.forEach(([ev,k]) => {
+        p.checked[k] = true;
+        p.hints.unshift({ kind, text: ev.text.replace('[찌라시] ', '') + ' → ' + (ev.truth ? '✅ 사실입니다' : '❌ 가짜입니다') });
+      });
+      msg = '팩트체크 완료!';
+    } else {
+      const s = G.stocks[sym];
+      if (!s) return bad('없는 종목이에요.');
+      if (p.symHints[sym]) return bad('이 종목은 오늘 이미 정보를 샀어요.');
+      p.cash -= cost;
+      const real = bucket(G.outcome[sym]);
+      let dir = real.dir, text;
+      if (kind === 'insider'){
+        text = `내일 ${real.label} 예상 (확실한 정보)`;
+      } else {
+        // 귀띔: 방향만, 정확도 약 75%
+        let d = Math.sign(real.dir);
+        if (Math.random() > 0.75){ const others = [-1, 0, 1].filter(x => x !== d); d = others[rnd(0, 1)]; }
+        dir = d;
+        text = d < 0 ? '내일 떨어질 것 같다는 소문' : d > 0 ? '내일 오를 것 같다는 소문' : '내일은 큰 움직임이 없을 거라는 소문';
+      }
+      p.symHints[sym] = { kind, dir, text };
+      p.hints.unshift({ kind, text: `${s.name}: ${text}` });
+      msg = `${s.name} 정보를 샀어요!`;
+    }
+    p.hintUsed = true;
+    return { ok: true, msg };
+  }
+
+  function actReady(p, v){
+    if (G.phase !== 'play' || G.busy) return;
+    p.ready = !!v;
+    maybeAdvance();
+  }
+  // 살아 있는 사람 플레이어가 모두 준비하면 하루를 끝냅니다.
+  function maybeAdvance(){
+    if (!G || G.phase !== 'play' || G.busy) return;
+    const hs = G.players.filter(p => p.human && !p.gone);
+    if (hs.length && hs.every(p => p.ready)) endDay();
+  }
+
+  /* ---------- 하루 진행 (방장·혼자 모드) ---------- */
+  // 하루의 결과(종목별 변동률)를 하루가 시작될 때 미리 정해 둡니다. 정보상의 힌트도 이 값을 바탕으로 해요.
+  function planDay(){
+    const news = todayNews(), mult = isFinal() ? 1.5 : 1;
+    const effect = {};
+    news.forEach(ev => Object.entries(ev.fx).forEach(([sym,pc]) => {
+      let p = pc * mult * (0.8 + Math.random() * 0.4);
+      if (ev.rumor && !ev.truth) p = -Math.abs(p) * Math.sign(pc) * 0.5;      // 가짜 찌라시: 속은 사람들이 던지며 반대로 움직임
+      effect[sym] = (effect[sym] || 0) + p;
+    }));
+    const outcome = {};
+    Object.values(G.stocks).forEach(s => {
+      const noise = gauss() * s.vol * 2.2 * 100;                               // % 단위
+      const pull = (s.start - s.price) / s.start * 3;                          // 시작가 쪽으로 살짝 되돌아오는 힘
+      outcome[s.sym] = noise + pull + (effect[s.sym] || 0);
+    });
+    G.outcome = outcome;
+    G.effectSyms = Object.keys(effect);
+  }
+
+  function openDay(){
+    G.players.forEach(p => { p.hints = []; p.symHints = {}; p.hintUsed = false; p.ready = false; });
+    planDay();
+    G.newsLog.unshift({ day: G.day, items: todayNews(), moves: null });
+    showBanner(isFinal() ? '🔥 FINAL DAY 🔥' : `DAY ${G.day}`);
+    renderNewsLog();
+  }
+
+  // AI 라이벌들은 하루가 끝나기 전, 오늘 뉴스를 보고 거래합니다.
+  function rivalsTrade(){
+    const news = todayNews();
+    G.players.filter(p => !p.human).forEach(r => {
+      if (r.style === 'random'){
+        const syms = Object.keys(G.stocks);
+        for (let i = 0; i < rnd(1,2); i++){
+          const sym = syms[rnd(0, syms.length - 1)], s = G.stocks[sym];
+          if (Math.random() < 0.6) buy(r, sym, Math.floor(r.cash * 0.25 / (s.price * (1 + FEE))));
+          else if (r.holdings[sym]) sell(r, sym, Math.ceil(r.holdings[sym].qty * 0.6));
+        }
+        return;
+      }
+      const skipRate = r.style === 'pro' ? 0.15 : 0.3;
+      if (Math.random() < skipRate) return;
+      const net = {};
+      news.forEach(ev => {
+        if (r.style === 'pro' && ev.rumor && Math.random() > 0.25) return;   // 여우 대리는 찌라시를 대부분 무시
+        Object.entries(ev.fx).forEach(([sym,pc]) => net[sym] = (net[sym] || 0) + pc);
+      });
+      const pos = Object.entries(net).filter(e => e[1] > 0), neg = Object.entries(net).filter(e => e[1] < 0);
+      neg.forEach(([sym]) => { if (r.holdings[sym]) sell(r, sym, r.holdings[sym].qty); });
+      const frac = r.style === 'pro' ? 0.55 : 0.7;
+      const budget = r.cash * frac;
+      pos.forEach(([sym]) => {
+        const s = G.stocks[sym];
+        buy(r, sym, Math.floor((budget / pos.length) / (s.price * (1 + FEE))));
+      });
+    });
+  }
+
+  function endDay(){
+    if (!G || G.phase !== 'play' || G.busy || G.mode === 'client') return;
+    G.busy = true;
+    rivalsTrade();
+
+    // 오늘의 변동률은 하루가 시작될 때 이미 정해져 있습니다(planDay).
+    const moves = {};
+    Object.values(G.stocks).forEach(s => {
+      s.prev = s.price;
+      const change = G.outcome[s.sym];
+      s.price = roundPrice(Math.min(s.start * 3, Math.max(s.start * 0.3, s.price * (1 + change / 100))));
+      s.hist.push(s.price);
+      if (s.hist.length > MAX_POINTS) s.hist.shift();
+      if (G.effectSyms.includes(s.sym)) moves[s.sym] = (s.price / s.prev - 1) * 100;
+    });
+    G.newsLog[0].moves = moves;
+    showBanner(`DAY ${G.day} 마감`);
+    render(); renderList(true);
+    broadcast();
+
+    setTimeout(() => {
+      if (G.day >= TOTAL_DAYS){ G.busy = false; return endGame(); }
+      G.day++;
+      openDay();
+      G.busy = false;
+      render();
+      broadcast();
+    }, 1100);
+  }
+
+  function endGame(){
+    G.phase = 'end';
+    G.busy = false;
+    render();
+    broadcast();
+    shownEnd = true;
+    showResult();
+  }
+
+  function showResult(){
+    const ranked = G.players.map(p => ({ p, t: total(p) })).sort((a,b) => b.t - a.t);
+    const myRank = ranked.findIndex(r => r.p === me()) + 1;
+    const last = myRank === ranked.length;
+    $('rTitle').textContent = myRank === 1 ? '🏆 우승! 오늘의 주식왕' : last ? '😱 꼴찌 확정...' : `🎖 ${myRank}위로 마무리!`;
+    $('rSub').textContent = myRank === 1 ? '뉴스를 제일 정확하게 읽으셨네요.' : '다음 판에는 찌라시를 조심해 보세요!';
+    $('rRank').innerHTML = ranked.map((r,i) => {
+      const rate = (r.t / START_CASH - 1) * 100;
+      return `<div class="rk ${r.p === me() ? 'me' : ''}">
+        <div class="no">${medal(i)}</div>
+        <div class="who">${esc(r.p.emoji)} ${esc(r.p.name)}</div>
+        <div class="tot num">${won(r.t)}<small class="${cls(rate)}">${pct(rate)}</small></div></div>`;
+    }).join('');
+    const pen = $('rPen');
+    if (last){
+      pen.style.display = 'block';
+      pen.textContent = '벌칙: ' + PENALTIES[rnd(0, PENALTIES.length - 1)];
+    } else pen.style.display = 'none';
+    $('againBtn').textContent = G.mode === 'solo' ? '다시 도전' : G.mode === 'host' ? '같은 방에서 다시 하기' : '나가기';
+    $('endOv').classList.add('show');
+  }
+
+  /* ---------- 렌더링 ---------- */
+  function renderHeader(){
+    const t = total(me()), pl = t - START_CASH;
+    $('sTotal').textContent = won(t);
+    $('sCash').textContent = won(me().cash);
+    $('sPL').textContent = (pl > 0 ? '+' : '') + won(pl) + ' (' + pct(pl / START_CASH * 100) + ')';
+    $('sPL').className = 'num ' + cls(pl);
+    $('dNo').textContent = isFinal() ? `DAY ${G.day}/${TOTAL_DAYS} · FINAL` : `DAY ${G.day}/${TOTAL_DAYS}`;
+    const multi = G.mode !== 'solo';
+    const humans = G.players.filter(p => p.human && !p.gone);
+    const rd = humans.filter(p => p.ready).length;
+    $('readyInfo').textContent = multi && G.phase === 'play' ? `준비 ${rd}/${humans.length}` : '';
+    $('forceBtn').style.display = (G.mode === 'host' && G.phase === 'play' && !G.busy && rd < humans.length) ? '' : 'none';
+    $('endDay').textContent = multi
+      ? (me().ready ? '✋ 준비 취소' : isFinal() ? '🏁 마지막 날 준비 완료' : '🌙 준비 완료')
+      : (isFinal() ? '🏁 마지막 날 끝내기' : '🌙 하루 끝내기');
+    $('endDay').disabled = G.phase !== 'play' || G.busy;
+    $('barFill').style.width = ((G.day - 1) / TOTAL_DAYS * 100) + '%';
+  }
+
+  function renderNews(){
+    const news = todayNews();
+    $('newsDay').textContent = `DAY ${G.day}`;
+    $('newsBoard').innerHTML = news.map((ev, i) => {
+      const checked = !!me().checked[newsKey(i)];
+      const note = !ev.rumor ? ''
+        : checked ? '<div class="note">' + (ev.truth ? '✅ 팩트체크 결과: 사실로 확인됨' : '❌ 팩트체크 결과: 가짜 뉴스로 확인됨') + '</div>'
+        : '<div class="note">⚠ 확인되지 않은 소문입니다. 사실일 수도, 아닐 수도 있어요.</div>';
+      return `<div class="ni ${ev.rumor ? 'rumor' : ''}">
+        <div class="tag">${ev.rumor ? '찌라시' : '속보'}</div>
+        <div><div class="txt">${esc(ev.text.replace('[찌라시] ', ''))}</div>${note}</div>
+      </div>`;
+    }).join('');
+    $('newsHint').textContent = G.mode !== 'solo'
+      ? (isFinal() ? '마지막 날이에요! 오늘 밤 변동폭은 1.5배입니다. 모두 준비 완료를 누르면 마무리돼요.'
+                   : '뉴스를 읽고 거래한 뒤 "준비 완료"를 누르세요. 모두 준비하면 하루가 끝나요. (NEWS 표시는 오늘 뉴스에 나온 종목)')
+      : (isFinal() ? '마지막 날이에요! 오늘 밤 변동폭은 1.5배입니다. 준비되면 위쪽의 버튼을 눌러 마무리하세요.'
+                   : '뉴스를 천천히 읽고, 준비되면 위쪽의 "하루 끝내기"를 눌러 주세요. (NEWS 표시는 오늘 뉴스에 나온 종목)');
+  }
+
+  function renderList(flash){
+    const el = $('list');
+    if (!el.children.length){
+      el.innerHTML = Object.values(G.stocks).map(s => `
+        <div class="stock" data-sym="${esc(s.sym)}">
+          <div><span class="nm">${esc(s.name)}</span><span class="sym">${esc(s.sym)}</span><span class="badge" style="display:none">NEWS</span><span class="hintb" style="display:none"></span></div>
+          <div class="pr num"></div>
+          <div class="sub"></div>
+          <div class="chg num"></div>
+        </div>`).join('');
+      el.querySelectorAll('.stock').forEach(n => n.onclick = () => { selected = n.dataset.sym; hoverIdx = null; render(); });
+    }
+    const hot = new Set();
+    if (G.phase === 'play' && !G.busy) todayNews().forEach(ev => (ev.syms || Object.keys(ev.fx || {})).forEach(k => hot.add(k)));
+    el.querySelectorAll('.stock').forEach(n => {
+      const s = G.stocks[n.dataset.sym];
+      const diff = s.price - s.prev, rate = diff / s.prev * 100;
+      n.classList.toggle('active', s.sym === selected);
+      n.querySelector('.badge').style.display = hot.has(s.sym) ? 'inline' : 'none';
+      const sh = me().symHints[s.sym], hb = n.querySelector('.hintb');
+      if (sh){ hb.style.display = 'inline'; hb.textContent = (sh.kind === 'tip' ? '귀띔 ' : '정보 ') + DIR_ICON[sh.dir]; }
+      else hb.style.display = 'none';
+      n.querySelector('.pr').textContent = num(s.price);
+      n.querySelector('.pr').className = 'pr num ' + cls(diff);
+      const h = me().holdings[s.sym];
+      n.querySelector('.sub').textContent = h ? `보유 ${num(h.qty)}주` : '';
+      const c = n.querySelector('.chg');
+      c.textContent = `${arrow(diff)} ${pct(rate)}`;
+      c.className = 'chg num ' + cls(diff);
+      if (flash && diff !== 0){
+        n.classList.remove('flash-up','flash-down'); void n.offsetWidth;
+        n.classList.add(diff > 0 ? 'flash-up' : 'flash-down');
+      }
+    });
+  }
+
+  function renderDetail(){
+    const s = G.stocks[selected];
+    const diff = s.price - s.prev, rate = diff / s.prev * 100;
+    $('cName').textContent = s.name; $('cSym').textContent = s.sym;
+    $('cPrice').textContent = num(s.price); $('cPrice').className = 'num ' + cls(diff);
+    $('cChg').textContent = `전일 대비 ${arrow(diff)} ${num(Math.abs(diff))} (${pct(rate)})`;
+    $('cChg').className = 'num ' + cls(diff);
+    $('stStart').textContent = num(s.start);
+    $('stHigh').textContent = num(Math.max(...s.hist));
+    $('stLow').textContent = num(Math.min(...s.hist));
+    const h = me().holdings[s.sym];
+    $('stQty').textContent = h ? num(h.qty) + '주' : '0주';
+    drawChart();
+  }
+
+  function renderOrder(){
+    const s = G.stocks[selected], h = me().holdings[selected];
+    const q = Math.max(0, Math.floor(+$('qty').value || 0));
+    $('oPrice').textContent = won(s.price);
+    if (side === 'buy'){
+      $('oAvailLabel').textContent = '주문 가능';
+      $('oAvail').textContent = won(me().cash) + ` (${num(maxBuy(selected))}주)`;
+      $('oTotal').textContent = won(s.price * q * (1 + FEE));
+      $('goBtn').textContent = '매수하기';
+    } else {
+      $('oAvailLabel').textContent = '매도 가능';
+      $('oAvail').textContent = (h ? num(h.qty) : 0) + '주';
+      $('oTotal').textContent = won(s.price * q * (1 - FEE - TAX));
+      $('goBtn').textContent = '매도하기';
+    }
+  }
+
+  function renderShop(){
+    const s = G.stocks[selected], m = me();
+    const play = G.phase === 'play' && !G.busy && !m.ready;
+    $('shopSel').textContent = `선택: ${s.name}`;
+    const owned = !!m.symHints[selected];
+    const rumors = todayNews().map((ev,i) => [ev, newsKey(i)]).filter(([ev]) => ev.rumor);
+    const unchecked = rumors.some(([ev,k]) => !m.checked[k]);
+    const set = (id, label, cost, off) => {
+      const b = $(id);
+      b.innerHTML = off ? label : m.hintUsed ? '오늘<br>완료' : `${label}<br>${num(cost)}원`;
+      b.disabled = !play || off || m.hintUsed || m.cash < cost;
+    };
+    set('buyTip',     owned ? '구매함' : '구매', HINT_COST.tip, owned);
+    set('buyInsider', owned ? '구매함' : '구매', HINT_COST.insider, owned);
+    set('buyCheck',   !rumors.length ? '찌라시 없음' : !unchecked ? '확인 완료' : '구매', HINT_COST.check, !unchecked);
+    const icon = { tip: '🗣', insider: '🕶', check: '🔎' };
+    $('hintLog').innerHTML = m.hints.length
+      ? m.hints.map(h => `<div class="hl">${icon[h.kind] || ''} <span class="t">${esc(h.text)}</span></div>`).join('')
+      : '<div class="hl" style="opacity:.6">오늘 산 정보가 없어요.</div>';
+  }
+
+  function renderRank(){
+    const ranked = G.players.map(p => ({ p, t: total(p) })).sort((a,b) => b.t - a.t);
+    const showReady = G.mode !== 'solo' && G.phase === 'play';
+    $('rank').innerHTML = ranked.map((r,i) => {
+      const rate = (r.t / START_CASH - 1) * 100;
+      const tag = r.p.gone ? ' <small class="flat">(나감)</small>' : (showReady && r.p.human && r.p.ready ? ' ✅' : '');
+      return `<div class="rk ${r.p === me() ? 'me' : ''}">
+        <div class="no">${medal(i)}</div>
+        <div class="who">${esc(r.p.emoji)} ${esc(r.p.name)}${tag}</div>
+        <div class="tot num">${won(r.t)}<small class="${cls(rate)}">${pct(rate)}</small></div></div>`;
+    }).join('');
+  }
+
+  function renderHoldings(){
+    const el = $('holdings'), rows = Object.entries(me().holdings);
+    if (!rows.length){ el.innerHTML = '<div class="empty">보유 중인 종목이 없습니다. 뉴스를 보고 먼저 사 보세요!</div>'; return; }
+    el.innerHTML = `<table><thead><tr><th>종목</th><th>수량</th><th>평균단가</th><th>현재가</th><th>평가손익</th><th>수익률</th><th></th></tr></thead><tbody>` +
+      rows.map(([sym,h]) => {
+        const s = G.stocks[sym], pl = (s.price - h.avg) * h.qty, r = (s.price / h.avg - 1) * 100;
+        return `<tr><td><b>${esc(s.name)}</b></td><td class="num">${num(h.qty)}</td><td class="num">${num(h.avg)}</td>
+          <td class="num">${num(s.price)}</td><td class="num ${cls(pl)}">${pl > 0 ? '+' : ''}${num(pl)}</td>
+          <td class="num ${cls(r)}">${pct(r)}</td><td><button class="mini" data-sellall="${esc(sym)}">전량매도</button></td></tr>`;
+      }).join('') + '</tbody></table>';
+    el.querySelectorAll('[data-sellall]').forEach(b => b.onclick = () => trade('sell', b.dataset.sellall, me().holdings[b.dataset.sellall].qty));
+  }
+
+  function renderNewsLog(){
+    if (!G.newsLog.length) return;
+    $('newsLog').innerHTML = G.newsLog.map(n => {
+      const done = !!n.moves;
+      const items = n.items.map(ev => {
+        let tg = '';
+        if (ev.rumor) tg = done ? (ev.truth ? '<span class="tg ok">사실</span>' : '<span class="tg no">가짜</span>') : '<span class="tg no">확인중</span>';
+        return `<div class="it">${tg}${esc(ev.text.replace('[찌라시] ', ''))}</div>`;
+      }).join('');
+      const mv = done ? `<div class="mv">${Object.entries(n.moves).map(([sym,v]) => `<span>${esc(G.stocks[sym].name)} <b class="${cls(v)}">${pct(v)}</b></span>`).join('')}</div>` : '<div class="mv">오늘 진행 중</div>';
+      return `<div class="nl"><small>DAY ${n.day}</small>${items}${mv}</div>`;
+    }).join('');
+  }
+
+  function render(){
+    if (!G) return;
+    renderHeader(); renderNews(); renderList(false); renderDetail(); renderOrder(); renderRank(); renderHoldings(); renderNewsLog(); renderShop();
+  }
+
+  /* ---------- 차트 (일 단위 종가) ---------- */
+  const canvas = $('chart'), ctx = canvas.getContext('2d');
+  function drawChart(){
+    if (!G) return;
+    const dpr = window.devicePixelRatio || 1;
+    const W = canvas.clientWidth, H = canvas.clientHeight;
+    if (canvas.width !== W * dpr || canvas.height !== H * dpr){ canvas.width = W * dpr; canvas.height = H * dpr; }
+    ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,H);
+
+    const s = G.stocks[selected], d = s.hist;
+    const padL = 8, padR = 64, padT = 14, padB = 16;
+    let min = Math.min(...d, s.start), max = Math.max(...d, s.start);
+    const span = (max - min) || 1; min -= span * .1; max += span * .1;
+    const step = (W - padL - padR) / (Math.max(d.length, 2) - 1);
+    const X = i => padL + step * i;
+    const Y = v => padT + (H - padT - padB) * (1 - (v - min) / (max - min));
+    const color = s.price >= s.prev ? '#ef4444' : '#3b82f6';
+
+    ctx.font = '11px sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    for (let i = 0; i <= 4; i++){
+      const v = min + (max - min) * i / 4, y = Y(v);
+      ctx.strokeStyle = '#242b36'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W - padR, y); ctx.stroke();
+      ctx.fillStyle = '#8b95a5'; ctx.fillText(num(v), W - padR + 8, y);
+    }
+    ctx.setLineDash([4,4]); ctx.strokeStyle = '#586274';
+    ctx.beginPath(); ctx.moveTo(padL, Y(s.start)); ctx.lineTo(W - padR, Y(s.start)); ctx.stroke(); ctx.setLineDash([]);
+
+    const g = ctx.createLinearGradient(0, padT, 0, H - padB);
+    g.addColorStop(0, color + '55'); g.addColorStop(1, color + '00');
+    ctx.beginPath(); ctx.moveTo(X(0), H - padB);
+    d.forEach((v,i) => ctx.lineTo(X(i), Y(v)));
+    ctx.lineTo(X(d.length - 1), H - padB); ctx.closePath(); ctx.fillStyle = g; ctx.fill();
+
+    ctx.beginPath();
+    d.forEach((v,i) => i ? ctx.lineTo(X(i), Y(v)) : ctx.moveTo(X(i), Y(v)));
+    ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.lineJoin = 'round'; ctx.stroke();
+
+    // 일별 점
+    ctx.fillStyle = color;
+    d.forEach((v,i) => { if (i >= d.length - 16){ ctx.beginPath(); ctx.arc(X(i), Y(v), 2.2, 0, 7); ctx.fill(); } });
+
+    const ly = Y(s.price), lx = X(d.length - 1);
+    ctx.setLineDash([2,3]); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(lx, ly); ctx.lineTo(W - padR, ly); ctx.stroke(); ctx.setLineDash([]);
+    ctx.beginPath(); ctx.arc(lx, ly, 4.5, 0, 7); ctx.fill();
+    ctx.fillRect(W - padR + 2, ly - 9, padR - 4, 18);
+    ctx.fillStyle = '#fff'; ctx.fillText(num(s.price), W - padR + 7, ly);
+
+    const h = me().holdings[selected];
+    if (h){
+      const ay = Y(h.avg);
+      if (ay > padT && ay < H - padB){
+        ctx.setLineDash([6,4]); ctx.strokeStyle = '#f5b942'; ctx.beginPath();
+        ctx.moveTo(padL, ay); ctx.lineTo(W - padR, ay); ctx.stroke(); ctx.setLineDash([]);
+        ctx.fillStyle = '#f5b942'; ctx.fillText('내 평단 ' + num(h.avg), padL + 4, ay - 8);
+      }
+    }
+    if (hoverIdx != null && d[hoverIdx] != null){
+      const hx = X(hoverIdx), hy = Y(d[hoverIdx]);
+      ctx.strokeStyle = '#8b95a5'; ctx.setLineDash([3,3]);
+      ctx.beginPath(); ctx.moveTo(hx, padT); ctx.lineTo(hx, H - padB); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(hx, hy, 4, 0, 7); ctx.fill();
+    }
+  }
+  const tip = $('tip');
+  canvas.addEventListener('mousemove', e => {
+    if (!G) return;
+    const r = canvas.getBoundingClientRect(), d = G.stocks[selected].hist;
+    const padL = 8, padR = 64, step = (r.width - padL - padR) / (Math.max(d.length, 2) - 1);
+    hoverIdx = Math.max(0, Math.min(d.length - 1, Math.round((e.clientX - r.left - padL) / step)));
+    drawChart();
+    const ago = d.length - 1 - hoverIdx;
+    tip.style.display = 'block'; tip.textContent = `${ago === 0 ? '오늘' : ago + '일 전'} · ${num(d[hoverIdx])}원`;
+    tip.style.left = Math.min(r.width - 150, e.clientX - r.left + 14) + 'px';
+    tip.style.top = (e.clientY - r.top - 10) + 'px';
+  });
+  canvas.addEventListener('mouseleave', () => { hoverIdx = null; tip.style.display = 'none'; drawChart(); });
+  window.addEventListener('resize', drawChart);
+
+  /* ---------- 알림 ---------- */
+  let toastT;
+  function toast(msg){
+    const t = $('toast'); t.textContent = msg; t.classList.add('show');
+    clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2200);
+  }
+  function displayBanner(msg){
+    const b = $('banner'); b.textContent = msg;
+    b.classList.remove('show'); void b.offsetWidth; b.classList.add('show');
+  }
+  function showBanner(msg){ bannerSeq++; bannerText = msg; displayBanner(msg); }
+
+  /* ---------- 내 행동 (UI → 혼자/방장은 직접 실행, 참가자는 방장에게 요청) ---------- */
+  function sendToHost(msg){ try { NET.conn.send(msg); } catch(e){ toast('방장과 연결이 불안정해요.'); } }
+
+  function trade(type, sym, qty){
+    if (!G || G.phase !== 'play' || G.busy) return;
+    if (G.mode === 'client') return sendToHost({ t:'trade', type, sym, qty });
+    const r = actTrade(me(), type, sym, qty);
+    toast(r.msg); render();
+    if (G.mode === 'host') broadcast();
+  }
+  function buyHint(kind){
+    if (!G || G.phase !== 'play' || G.busy) return;
+    if (G.mode === 'client') return sendToHost({ t:'hint', kind, sym: selected });
+    const r = actHint(me(), kind, selected);
+    toast(r.msg); render();
+    if (G.mode === 'host') broadcast();
+  }
+  function onEndClick(){
+    if (!G || G.phase !== 'play' || G.busy) return;
+    if (G.mode === 'client') return sendToHost({ t:'ready', v: !me().ready });
+    actReady(me(), G.mode === 'solo' ? true : !me().ready);
+    render();
+    if (G.mode === 'host') broadcast();
+  }
+
+  /* ================= 멀티플레이 (PeerJS: 방 코드로 접속) ================= */
+  // 방장의 브라우저가 게임 계산을 전부 맡고, 참가자는 방장이 보내 준 화면 정보만 받아서 그립니다.
+  // 다른 사람의 보유 종목·정보상 힌트·미공개 뉴스 진위는 서로에게 보내지 않아요.
+  const netMsg = t => { $('netMsg').textContent = t; };
+  const peerReady = () => {
+    if (typeof Peer === 'undefined'){
+      netMsg('인터넷 연결이 필요해요 (접속용 라이브러리를 불러오지 못했어요). 혼자 하기는 오프라인에서도 돼요.');
+      return false;
+    }
+    return true;
+  };
+  const cleanName = (raw, fallback) => (String(raw || '').trim().slice(0, 8)) || fallback;
+  const genCode = () => { const c = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let s = ''; for (let i = 0; i < 5; i++) s += c[rnd(0, c.length - 1)]; return s; };
+
+  /* --- 방장 --- */
+  function hostRoom(){
+    if (!peerReady()) return;
+    const name = cleanName($('pname').value, '방장');
+    $('hostBtn').disabled = true; netMsg('방을 만드는 중...');
+    let tries = 0;
+    const attempt = () => {
+      const code = genCode();
+      const peer = new Peer(PEER_PREFIX + code, { debug: 0 });
+      peer.on('open', () => {
+        NET = { role: 'host', peer, code, started: false, ai: false,
+                players: [ mkPlayer({ id: 'host', name, emoji: HUMAN_EMOJIS[0] }) ] };
+        peer.on('connection', conn => {
+          conn.on('data', msg => hostOnMessage(conn, msg));
+          conn.on('close', () => hostOnClose(conn));
+          conn.on('error', () => hostOnClose(conn));
+        });
+        peer.on('disconnected', () => { try { peer.reconnect(); } catch(e){} });
+        showLobby();
+      });
+      peer.on('error', e => {
+        if (!NET && e.type === 'unavailable-id' && tries++ < 5){ try { peer.destroy(); } catch(_){} return attempt(); }
+        if (!NET){ netMsg('방을 만들지 못했어요: ' + (e.type || e)); $('hostBtn').disabled = false; }
+        else toast('연결 오류: ' + (e.type || e));
+      });
+    };
+    attempt();
+  }
+
+  const reply = (conn, msg) => { try { conn.send(msg); } catch(e){} };
+
+  function hostOnMessage(conn, msg){
+    if (!NET || !msg || typeof msg !== 'object') return;
+    let pl = NET.players.find(p => p.connId === conn.peer);
+
+    if (msg.t === 'join'){
+      if (pl) return;
+      if (NET.started) return reply(conn, { t:'reject', reason:'이미 게임이 시작된 방이에요.' });
+      if (NET.players.length >= MAX_HUMANS) return reply(conn, { t:'reject', reason:`방이 가득 찼어요 (최대 ${MAX_HUMANS}명).` });
+      let name = cleanName(msg.name, '친구');
+      while (NET.players.some(p => p.name === name)) name = name.slice(0, 7) + rnd(2, 9);
+      pl = mkPlayer({ id: 'p-' + conn.peer, name, emoji: HUMAN_EMOJIS[NET.players.length], connId: conn.peer, conn });
+      NET.players.push(pl);
+      reply(conn, { t:'joined' });
+      broadcastLobby(); renderLobby();
+      return;
+    }
+    if (!pl || !G || G.mode !== 'host' || G.phase !== 'play') return;
+
+    let r = null;
+    if (msg.t === 'trade'){
+      if (msg.type !== 'buy' && msg.type !== 'sell') return;
+      r = actTrade(pl, msg.type, String(msg.sym), Number(msg.qty));
+    } else if (msg.t === 'hint'){
+      r = actHint(pl, String(msg.kind), String(msg.sym));
+    } else if (msg.t === 'ready'){
+      actReady(pl, !!msg.v);
+    } else return;
+    if (r) reply(conn, { t:'toast', msg: r.msg });
+    render(); broadcast();
+  }
+
+  function hostOnClose(conn){
+    if (!NET) return;
+    const pl = NET.players.find(p => p.connId === conn.peer);
+    if (!pl) return;
+    if (!NET.started){
+      NET.players = NET.players.filter(p => p !== pl);
+      broadcastLobby(); renderLobby();
+      return;
+    }
+    if (pl.gone) return;
+    pl.gone = true;
+    toast(`${pl.name} 님이 나갔어요.`);
+    maybeAdvance();
+    if (G) { render(); broadcast(); }
+  }
+
+  function startHostGame(){
+    if (!NET || NET.role !== 'host') return;
+    const ai = $('aiOpt').checked;
+    const humans = NET.players.filter(p => !p.gone);
+    if (humans.length + (ai ? RIVALS.length : 0) < 2) return toast('최소 2명이 필요해요. 친구를 기다리거나 AI를 켜 주세요.');
+    NET.started = true; NET.ai = ai;
+    startOrRematch();
+  }
+  function startOrRematch(){
+    NET.players = NET.players.filter(p => !p.gone);
+    NET.players.forEach(resetPlayer);
+    const players = [...NET.players];
+    if (NET.ai) RIVALS.forEach(r => players.push(mkPlayer({ ...r, human: false })));
+    createGame(players, 'host');
+  }
+
+  function broadcastLobby(){
+    if (!NET || NET.role !== 'host') return;
+    const msg = { t:'lobby', players: NET.players.map(p => ({ name: p.name, emoji: p.emoji })), ai: $('aiOpt').checked };
+    NET.players.forEach(p => { if (p.conn) reply(p.conn, msg); });
+  }
+
+  // 참가자마다 "그 사람이 봐도 되는 정보"만 골라서 보냅니다.
+  function viewFor(q){
+    const g = G;
+    return {
+      t: 'state', phase: g.phase, day: g.day, busy: g.busy, bannerSeq, bannerText,
+      stocks: Object.values(g.stocks).map(s => ({ sym: s.sym, name: s.name, start: s.start, price: s.price, prev: s.prev, hist: s.hist })),
+      news: todayNews().map((ev, i) => {
+        const o = { text: ev.text, rumor: !!ev.rumor, syms: Object.keys(ev.fx) };
+        if (q.checked[newsKey(i)]) o.truth = ev.truth;            // 팩트체크한 사람에게만 진위를 알려 줌
+        return o;
+      }),
+      newsLog: g.newsLog.map(n => {
+        const done = !!n.moves;
+        return { day: n.day, moves: n.moves, items: n.items.map(ev => {
+          const o = { text: ev.text, rumor: !!ev.rumor };
+          if (done) o.truth = ev.truth;                          // 하루가 끝난 뒤에만 공개
+          return o;
+        }) };
+      }),
+      me: { id: q.id, name: q.name, emoji: q.emoji, human: true, cash: q.cash, holdings: q.holdings, hints: q.hints,
+            symHints: q.symHints, hintUsed: q.hintUsed, checked: q.checked, ready: q.ready, gone: false },
+      others: g.players.filter(p => p !== q).map(p => ({ id: p.id, name: p.name, emoji: p.emoji, human: p.human, ready: p.ready, gone: p.gone, total: total(p) })),
+    };
+  }
+  function broadcast(){
+    if (!G || G.mode !== 'host' || !NET) return;
+    G.players.forEach(p => { if (p.conn && !p.gone) reply(p.conn, viewFor(p)); });
+  }
+
+  /* --- 참가자 --- */
+  function joinRoom(){
+    if (!peerReady()) return;
+    const code = $('joinCode').value.trim().toUpperCase();
+    if (code.length !== 5) return netMsg('방 코드 5자리를 입력해 주세요.');
+    const name = cleanName($('pname').value, '친구');
+    $('joinBtn').disabled = true; netMsg('방에 접속하는 중...');
+    const peer = new Peer(undefined, { debug: 0 });
+    let settled = false;
+    const fail = m => {
+      if (settled) return; settled = true;
+      netMsg(m); $('joinBtn').disabled = false;
+      try { peer.destroy(); } catch(_){}
+      NET = null;
+    };
+    const timer = setTimeout(() => fail('접속 시간이 초과됐어요. 코드와 인터넷을 확인해 주세요. (일부 회사·학교·통신사 네트워크에서는 연결이 안 될 수 있어요)'), 15000);
+    peer.on('error', e => {
+      clearTimeout(timer);
+      if (!settled) fail(e.type === 'peer-unavailable' ? '방을 찾을 수 없어요. 코드를 다시 확인해 주세요.' : '연결 오류: ' + (e.type || e));
+      else toast('연결 오류: ' + (e.type || e));
+    });
+    peer.on('open', () => {
+      const conn = peer.connect(PEER_PREFIX + code, { reliable: true, serialization: 'json' });
+      NET = { role: 'client', peer, conn, code, lobby: null };
+      conn.on('open', () => { clearTimeout(timer); settled = true; conn.send({ t:'join', name }); });
+      conn.on('data', clientOnMessage);
+      conn.on('close', onHostLost);
+    });
+  }
+
+  function clientOnMessage(m){
+    if (!m || typeof m !== 'object' || !NET) return;
+    if (m.t === 'joined') return showLobby();
+    if (m.t === 'lobby'){ NET.lobby = m; return renderLobby(); }
+    if (m.t === 'toast') return toast(String(m.msg));
+    if (m.t === 'reject'){
+      netMsg(String(m.reason)); $('joinBtn').disabled = false;
+      $('lobbyOv').classList.remove('show'); $('startOv').classList.add('show');
+      try { NET.peer.destroy(); } catch(_){}
+      NET = null; return;
+    }
+    if (m.t === 'state') applyState(m);
+  }
+
+  function applyState(m){
+    if (!G || G.mode !== 'client'){
+      G = { mode: 'client' };
+      resetUI();
+      $('startOv').classList.remove('show'); $('lobbyOv').classList.remove('show');
+    }
+    if (G.phase === 'end' && m.phase === 'play') resetUI();      // 방장이 같은 방에서 다시 시작함
+    G.phase = m.phase; G.day = m.day; G.busy = m.busy;
+    G.stocks = {}; m.stocks.forEach(s => { G.stocks[s.sym] = s; });
+    G.days = []; G.days[m.day - 1] = m.news;
+    G.newsLog = m.newsLog;
+    G.players = [m.me, ...m.others];
+    if (m.bannerSeq !== lastBanner){ lastBanner = m.bannerSeq; if (m.bannerText) displayBanner(m.bannerText); }
+    render();
+    if (m.phase === 'end' && !shownEnd){ shownEnd = true; showResult(); }
+  }
+
+  function onHostLost(){
+    alert('방장과 연결이 끊어졌어요. 처음 화면으로 돌아갑니다.');
+    location.reload();
+  }
+
+  /* --- 대기실 --- */
+  function showLobby(){
+    $('startOv').classList.remove('show');
+    $('lobbyOv').classList.add('show');
+    renderLobby();
+  }
+  function renderLobby(){
+    if (!NET) return;
+    const host = NET.role === 'host';
+    const players = host ? NET.players.map(p => ({ name: p.name, emoji: p.emoji })) : (NET.lobby ? NET.lobby.players : []);
+    $('roomCode').textContent = NET.code;
+    $('lobbyPlayers').innerHTML = players.map((p, i) =>
+      `<div class="pl"><span>${esc(p.emoji)} ${esc(p.name)}</span><span class="flat">${i === 0 ? '방장' : ''}</span></div>`).join('');
+    $('aiRow').style.display = host ? '' : 'none';
+    $('lobbyStart').style.display = host ? '' : 'none';
+    $('lobbySub').textContent = host ? '이 코드를 친구들에게 알려 주세요.' : '방에 들어왔어요!';
+    $('lobbyWait').textContent = host
+      ? `현재 ${players.length}/${MAX_HUMANS}명 · 시작하면 더 이상 입장할 수 없어요.`
+      : `방장이 시작하길 기다리는 중... (${players.length}/${MAX_HUMANS}명${NET.lobby && NET.lobby.ai ? ' · AI 라이벌 포함' : ''})`;
+  }
+
+  /* ---------- 이벤트 ---------- */
+  function setSide(m){
+    side = m;
+    $('tabBuy').classList.toggle('on', m === 'buy');
+    $('tabSell').classList.toggle('on', m === 'sell');
+    $('goBtn').className = 'go ' + m;
+    if (G) renderOrder();
+  }
+  $('tabBuy').onclick = () => setSide('buy');
+  $('tabSell').onclick = () => setSide('sell');
+  $('qty').addEventListener('input', () => G && renderOrder());
+  document.querySelectorAll('.quick button').forEach(b => b.onclick = () => {
+    if (!G) return;
+    if (b.dataset.q === 'max'){
+      const h = me().holdings[selected];
+      $('qty').value = Math.max(1, side === 'buy' ? maxBuy(selected) : (h ? h.qty : 1));
+    } else $('qty').value = (Math.floor(+$('qty').value || 0)) + +b.dataset.q;
+    renderOrder();
+  });
+  $('goBtn').onclick = () => trade(side, selected, +$('qty').value);
+  $('qty').addEventListener('keydown', e => { if (e.key === 'Enter') $('goBtn').click(); });
+  $('endDay').onclick = onEndClick;
+  $('forceBtn').onclick = () => { if (G && G.mode === 'host') endDay(); };
+  $('buyTip').onclick = () => buyHint('tip');
+  $('buyInsider').onclick = () => buyHint('insider');
+  $('buyCheck').onclick = () => buyHint('check');
+
+  $('startBtn').onclick = () => newSolo(cleanName($('pname').value, '나'));
+  $('pname').addEventListener('keydown', e => { if (e.key === 'Enter') $('startBtn').click(); });
+  $('hostBtn').onclick = hostRoom;
+  $('joinBtn').onclick = joinRoom;
+  $('joinCode').addEventListener('keydown', e => { if (e.key === 'Enter') joinRoom(); });
+  $('aiOpt').addEventListener('change', broadcastLobby);
+  $('lobbyStart').onclick = startHostGame;
+  $('lobbyLeave').onclick = () => location.reload();
+  $('copyCode').onclick = () => {
+    try { navigator.clipboard.writeText(NET.code).then(() => toast('방 코드를 복사했어요!')); }
+    catch(e){ toast('코드를 길게 눌러 직접 복사해 주세요.'); }
+  };
+  $('againBtn').onclick = () => {
+    if (!G) return;
+    if (G.mode === 'solo') return newSolo(me().name);
+    if (G.mode === 'host') return startOrRematch();
+    location.reload();
+  };
+})();
+</script>
+</body>
+</html>
